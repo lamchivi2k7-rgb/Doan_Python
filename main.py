@@ -123,7 +123,8 @@ def render_tables():
     document.getElementById("total-count").textContent = str(total_count)
     document.getElementById("total-value").textContent = format_currency(total_value)
     
-    total_revenue = sum(float(o['total']) for o in orders if o['id'].startswith('DH'))
+    # Tính doanh thu thực tế (Trừ đi những đơn đã bị Hoàn trả)
+    total_revenue = sum(float(o['total']) for o in orders if o['id'].startswith('DH') and o.get('status') != 'refunded')
     if document.getElementById("total-revenue"):
         document.getElementById("total-revenue").textContent = format_currency(total_revenue)
 
@@ -140,7 +141,7 @@ def edit_inventory_product(index):
                 p['quantity'] = new_qty
                 orders.append({
                     "id": f"KK{len(orders)+1:03d}", "name": f"{'[Kiểm dư]' if diff > 0 else '[Kiểm thiếu]'} {p['name']}",
-                    "quantity": abs(diff), "price": 0, "total": 0, "time": datetime.now().strftime("%H:%M %d/%m/%y")
+                    "quantity": abs(diff), "price": 0, "total": 0, "time": datetime.now().strftime("%H:%M %d/%m/%y"), "status": "done"
                 })
                 save_data(); render_tables(); render_orders_table()
         except ValueError: pass
@@ -169,7 +170,8 @@ def handle_modal_confirm(event):
     time_str = datetime.now().strftime("%H:%M %d/%m/%y")
     if current_modal_action == "sell":
         if qty > p['quantity']: return
-        orders.append({"id": f"DH{len(orders)+1:03d}", "name": p['name'], "quantity": qty, "price": float(p['price']), "total": qty * float(p['price']), "time": time_str})
+        # Đơn hàng mới mặc định có trạng thái 'paid' (Đã thanh toán)
+        orders.append({"id": f"DH{len(orders)+1:03d}", "name": p['name'], "quantity": qty, "price": float(p['price']), "total": qty * float(p['price']), "time": time_str, "status": "paid"})
         p['quantity'] -= qty
     elif current_modal_action == "delete":
         if qty >= p['quantity']:
@@ -182,13 +184,34 @@ def handle_modal_confirm(event):
     save_data(); document.getElementById("quantity-modal").classList.remove("open")
     render_tables(); render_orders_table(); render_deleted_table()
 
+def trigger_return_request(order_id):
+    """Khách hàng đổi ý, gửi yêu cầu hoàn hàng"""
+    global orders
+    for o in orders:
+        if o['id'] == order_id:
+            if window.confirm(f"Bạn muốn gửi yêu cầu Trả hàng / Hoàn tiền cho đơn {order_id}?"):
+                o['status'] = 'return_pending'
+                save_data(); render_tables(); render_orders_table()
+            break
+
+def approve_return_request(order_id):
+    """Nhân viên duyệt yêu cầu hoàn trả đơn hàng -> Hàng trả lại về Kho thực tế"""
+    global orders, products
+    order_to_refund = next((o for o in orders if o['id'] == order_id), None)
+    if order_to_refund and order_to_refund.get('status') == 'return_pending':
+        if window.confirm(f"Xác nhận duyệt HOÀN TIỀN & NHẬP TRẢ LẠI KHO cho đơn {order_id}?"):
+            order_to_refund['status'] = 'refunded'
+            # Cộng trả lại số lượng vật lý vào kho
+            for p in products:
+                if p['name'] == order_to_refund['name']:
+                    p['quantity'] += order_to_refund['quantity']
+                    break
+            save_data(); render_tables(); render_orders_table()
+
 def delete_order(order_id):
     global orders, products
     order_to_delete = next((o for o in orders if o['id'] == order_id), None)
     if order_to_delete:
-        if order_id.startswith('DH'):
-            for p in products:
-                if p['name'] == order_to_delete['name']: p['quantity'] += order_to_delete['quantity']; break
         orders.remove(order_to_delete)
         save_data(); render_tables(); render_orders_table()
 
@@ -203,13 +226,22 @@ def render_orders_table():
         tr = document.createElement("tr")
         
         don_gia_goc = float(o.get('price', 0))
+        current_status = o.get('status', 'paid')
         
+        # Thiết lập badge trạng thái động giống Shopee
         if o['id'].startswith('KK'):
             status_badge = "<span class='badge bg-danger'>Kiểm kho</span>"
             hien_thi_tien = "Kiểm kho"
         else:
-            status_badge = "<span class='badge bg-success'>Đã thanh toán</span>"
-            hien_thi_tien = format_currency(don_gia_goc) if don_gia_goc > 0 else "0 đ"
+            if current_status == 'paid':
+                status_badge = "<span class='badge bg-success'>Đã thanh toán</span>"
+                hien_thi_tien = format_currency(don_gia_goc) if don_gia_goc > 0 else "0 đ"
+            elif current_status == 'return_pending':
+                status_badge = "<span class='badge bg-warning text-dark'><i class='fa-solid fa-clock-rotate-left'></i> Chờ duyệt hoàn</span>"
+                hien_thi_tien = format_currency(don_gia_goc)
+            elif current_status == 'refunded':
+                status_badge = "<span class='badge bg-secondary' style='background-color:#64748b !important;'><i class='fa-solid fa-arrow-rotate-left'></i> Đã hoàn trả kho</span>"
+                hien_thi_tien = f"<del style='color:#94a3b8;'>{format_currency(don_gia_goc)}</del>"
 
         tr.innerHTML = f"""
             <td>{o.get('time', '15:00 14/06/26')}</td>
@@ -221,11 +253,34 @@ def render_orders_table():
         
         td_cancel = document.createElement("td")
         
-        # KIỂM TRA: Nếu mã đơn bắt đầu bằng 'DH' (Đơn hàng đã đặt/thanh toán) thì ẩn nút Hủy
+        # XỬ LÝ NÚT THAO TÁC THEO TRẠNG THÁI
         if o['id'].startswith('DH'):
-            td_cancel.innerHTML = "<span class='text-muted' style='font-size:0.85rem; color:#94a3b8; font-weight:500;'>N/A</span>"
+            if current_status == 'paid':
+                # Nút cho phép Khách hàng đổi ý gửi yêu cầu trả hàng
+                btn_return = document.createElement("button")
+                btn_return.innerHTML = "<i class='fa-solid fa-arrow-turn-down'></i> Đổi ý hoàn đơn"
+                btn_return.className = "btn-gcp-pay"  # Sử dụng màu xanh dương để làm nổi bật thao tác hợp lệ
+                btn_return.style.padding = "4px 8px"
+                btn_return.style.fontSize = "0.8rem"
+                btn_return.style.backgroundColor = "#f59e0b"  # Màu cam hổ phách
+                btn_return.addEventListener("click", create_proxy(lambda e, oid=o['id']: trigger_return_request(oid)))
+                td_cancel.appendChild(btn_return)
+                
+            elif current_status == 'return_pending':
+                # Nút dành cho Admin duyệt lệnh đồng ý trả tiền, nhập lại kho
+                btn_approve = document.createElement("button")
+                btn_approve.innerHTML = "<i class='fa-solid fa-circle-check'></i> Duyệt Hoàn Kho"
+                btn_approve.className = "btn-gcp-serve"
+                btn_approve.style.padding = "4px 8px"
+                btn_approve.style.fontSize = "0.8rem"
+                btn_approve.addEventListener("click", create_proxy(lambda e, oid=o['id']: approve_return_request(oid)))
+                td_cancel.appendChild(btn_approve)
+                
+            elif current_status == 'refunded':
+                # Đã giải quyết xong xuôi
+                td_cancel.innerHTML = "<span class='text-muted' style='font-size:0.85rem; color:#94a3b8; font-weight:500;'>Hoàn tất</span>"
         else:
-            # Chỉ hiển thị nút hủy đối với các biên bản Kiểm Kho ('KK')
+            # Đối với biên bản kiểm kê kho (KK) thì vẫn giữ nút hủy biên bản như cũ
             btn_cancel = document.createElement("button")
             btn_cancel.innerHTML = "<i class='fa-solid fa-rectangle-xmark'></i> Hủy"
             btn_cancel.className = "btn-gcp-cancel"
