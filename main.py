@@ -201,14 +201,37 @@ def render_orders_table():
     for o in reversed(orders):
         if query and (query not in o['id'].lower() and query not in o['name'].lower()): continue
         tr = document.createElement("tr")
-        tr.innerHTML = f"<td>{o.get('time', '15:00 14/06/26')}</td><td class='fw-semibold'><span style='color:#3b82f6;'>{o['id']}</span> - {o['name']}</td><td>{o['quantity']}</td><td class='fw-bold text-green'>{format_currency(float(o['total'])) if float(o['total']) > 0 else 'Kiểm kho'}</td>"
+        
+        don_gia_goc = float(o.get('price', 0))
+        
+        if o['id'].startswith('KK'):
+            status_badge = "<span class='badge bg-danger'>Kiểm kho</span>"
+            hien_thi_tien = "Kiểm kho"
+        else:
+            status_badge = "<span class='badge bg-success'>Đã thanh toán</span>"
+            hien_thi_tien = format_currency(don_gia_goc) if don_gia_goc > 0 else "0 đ"
+
+        tr.innerHTML = f"""
+            <td>{o.get('time', '15:00 14/06/26')}</td>
+            <td class='fw-semibold'><span style='color:#3b82f6;'>{o['id']}</span> - {o['name']}</td>
+            <td>{o['quantity']}</td>
+            <td class='fw-bold text-green'>{hien_thi_tien}</td>
+            <td>{status_badge}</td>
+        """
         
         td_cancel = document.createElement("td")
-        btn_cancel = document.createElement("button")
-        btn_cancel.innerHTML = "<i class='fa-solid fa-rectangle-xmark'></i> Hủy"
-        btn_cancel.className = "btn-gcp-cancel"
-        btn_cancel.addEventListener("click", create_proxy(lambda e, oid=o['id']: delete_order(oid) if window.confirm(f"Hủy đơn {oid}?") else None))
-        td_cancel.appendChild(btn_cancel)
+        
+        # KIỂM TRA: Nếu mã đơn bắt đầu bằng 'DH' (Đơn hàng đã đặt/thanh toán) thì ẩn nút Hủy
+        if o['id'].startswith('DH'):
+            td_cancel.innerHTML = "<span class='text-muted' style='font-size:0.85rem; color:#94a3b8; font-weight:500;'>N/A</span>"
+        else:
+            # Chỉ hiển thị nút hủy đối với các biên bản Kiểm Kho ('KK')
+            btn_cancel = document.createElement("button")
+            btn_cancel.innerHTML = "<i class='fa-solid fa-rectangle-xmark'></i> Hủy"
+            btn_cancel.className = "btn-gcp-cancel"
+            btn_cancel.addEventListener("click", create_proxy(lambda e, oid=o['id']: delete_order(oid) if window.confirm(f"Hủy đơn {oid}?") else None))
+            td_cancel.appendChild(btn_cancel)
+            
         tr.appendChild(td_cancel)
         tbody.appendChild(tr)
 
@@ -242,4 +265,4 @@ def main():
     if document.getElementById("search-input"): document.getElementById("search-input").addEventListener("input", create_proxy(handle_search_product))
     if document.getElementById("search-order"): document.getElementById("search-order").addEventListener("input", create_proxy(handle_search_order))
 
-main()              
+main()
