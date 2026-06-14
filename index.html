@@ -167,7 +167,7 @@
                 id="product-quantity"
                 placeholder="Số lượng nhập kho..."
               />
-              <button id="add-btn" class="primary-btn">
+              <button id="add-btn" type="button" class="primary-btn">
                 <i class="fa-solid fa-plus"></i> Thêm Mặt Hàng
               </button>
             </div>
@@ -242,7 +242,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h3 id="modal-title">Cập Nhật Kho Sản Phẩm</h3>
-          <button class="close-modal-btn" onclick="document.getElementById('quantity-modal').classList.remove('open')">&times;</button>
+          <button class="close-modal-btn" type="button" onclick="document.getElementById('quantity-modal').classList.remove('open')">&times;</button>
         </div>
         <div class="modal-body">
           <div style="margin-top: 0.5rem;">
@@ -251,49 +251,51 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn-secondary" onclick="document.getElementById('quantity-modal').classList.remove('open')">Hủy Bỏ</button>
-          <button id="modal-confirm-btn" style="color: white; border: none; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer;">Xác Nhận Hệ Thống</button>
+          <button class="btn-secondary" type="button" onclick="document.getElementById('quantity-modal').classList.remove('open')">Hủy Bỏ</button>
+          <button id="modal-confirm-btn" type="button" style="color: white; border: none; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer;">Xác Nhận Hệ Thống</button>
         </div>
       </div>
     </div>
 
-    <div id="return-reason-modal" class="modal-overlay">
-      <div class="modal-content" style="max-width: 450px;">
+    <div id="modal-cancel-refund" class="modal-overlay">
+      <div class="modal-content" style="max-width: 450px; border-top: 5px solid #ef4444;">
         <div class="modal-header">
-          <h3 style="color: #f59e0b;"><i class="fa-solid fa-circle-question"></i> Yêu Cầu Đổi Ý Hoàn Đơn</h3>
-          <button class="close-modal-btn" onclick="document.getElementById('return-reason-modal').classList.remove('open')">&times;</button>
+          <h3 style="color: #ef4444;"><i class="fa-solid fa-circle-xmark"></i> Yêu Cầu Hủy Đơn & Hoàn Tiền</h3>
+          <button class="close-modal-btn" type="button" onclick="document.getElementById('modal-cancel-refund').classList.remove('open')">&times;</button>
         </div>
         <div class="modal-body">
           <p style="margin-bottom: 1rem; color: #475569; font-size: 0.9rem;">
-            Mã giao dịch đơn: <span id="return-modal-oid" style="font-weight: 700; color: #0066cc;">DH001</span>
+            Đang xử lý hủy đơn: <span id="cancel-modal-oid" style="font-weight: 700; color: #ef4444;">DH000</span>
           </p>
-          
-          <label style="font-weight: 700; font-size: 0.85rem; color: #1e293b; display: block; margin-bottom: 0.5rem;">VUI LÒNG CHỌN HÌNH THỨC ĐỔI Ý:</label>
-          <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
-            <label style="display: flex; align-items: center; gap: 0.75rem; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer;">
-              <input type="radio" name="return_action_type" value="cancel_refund" checked>
-              <div>
-                <strong style="color: #ef4444; display: block; margin-bottom: 2px;">Hủy đơn & Hoàn tiền</strong>
-                <div style="font-size: 0.75rem; color: #64748b;">Tôi muốn hủy hẳn giao dịch và nhận tiền lại.</div>
-              </div>
-            </label>
-            
-            <label style="display: flex; align-items: center; gap: 0.75rem; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer;">
-              <input type="radio" name="return_action_type" value="exchange_product">
-              <div>
-                <strong style="color: #0066cc; display: block; margin-bottom: 2px;">Yêu cầu đổi sản phẩm khác</strong>
-                <div style="font-size: 0.75rem; color: #64748b;">Sản phẩm bị nhầm mẫu, sai thông số hoặc muốn đổi cái khác.</div>
-              </div>
-            </label>
-          </div>
-
-          <label style="font-weight: 700; font-size: 0.85rem; color: #1e293b; display: block; margin-bottom: 0.5rem;">LÝ DO CHI TIẾT (TÙY CHỌN):</label>
-          <textarea id="return-reason-text" rows="3" placeholder="Ghi lý do chi tiết để cửa hàng duyệt nhanh hơn..." style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; resize: none; font-family: inherit; outline: none;"></textarea>
+          <label style="font-weight: 700; font-size: 0.85rem; color: #1e293b; display: block; margin-bottom: 0.5rem;">LÝ DO HỦY ĐƠN HOÀN TIỀN:</label>
+          <textarea id="cancel-reason-text" rows="3" placeholder="Nhập lý do hủy đơn (ví dụ: Đổi ý không mua nữa, đặt nhầm sản phẩm...)" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; resize: none; font-family: inherit; outline: none;"></textarea>
         </div>
         <div class="modal-footer">
-          <button class="btn-secondary" onclick="document.getElementById('return-reason-modal').classList.remove('open')">Đóng lại</button>
-          <button id="return-submit-btn" style="background-color: #f59e0b; color: white; border: none; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
-            Xác Nhận Gửi Cửa Hàng
+          <button class="btn-secondary" type="button" onclick="document.getElementById('modal-cancel-refund').classList.remove('open')">Đóng lại</button>
+          <button id="cancel-submit-btn" type="button" style="background-color: #ef4444; color: white; border: none; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
+            Xác Nhận Hủy Đơn
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-exchange-product" class="modal-overlay">
+      <div class="modal-content" style="max-width: 450px; border-top: 5px solid #3b82f6;">
+        <div class="modal-header">
+          <h3 style="color: #3b82f6;"><i class="fa-solid fa-arrows-rotate"></i> Yêu Cầu Đổi Trả Sản Phẩm</h3>
+          <button class="close-modal-btn" type="button" onclick="document.getElementById('modal-exchange-product').classList.remove('open')">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin-bottom: 1rem; color: #475569; font-size: 0.9rem;">
+            Đang xử lý đổi hàng đơn: <span id="exchange-modal-oid" style="font-weight: 700; color: #3b82f6;">DH000</span>
+          </p>
+          <label style="font-weight: 700; font-size: 0.85rem; color: #1e293b; display: block; margin-bottom: 0.5rem;">LÝ DO ĐỔI TRẢ MẶT HÀNG:</label>
+          <textarea id="exchange-reason-text" rows="3" placeholder="Nhập lý do đổi trả (ví dụ: Sản phẩm bị lỗi kỹ thuật, sai kích thước, giao nhầm màu...)" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; resize: none; font-family: inherit; outline: none;"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" type="button" onclick="document.getElementById('modal-exchange-product').classList.remove('open')">Đóng lại</button>
+          <button id="exchange-submit-btn" type="button" style="background-color: #3b82f6; color: white; border: none; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
+            Xác Nhận Đổi Hàng
           </button>
         </div>
       </div>
@@ -326,6 +328,6 @@
       }
     </script>
 
-    <script type="py" src="./main.py" config='{"packages":["json", "datetime"]}'></script>
+    <script type="py" src="./main.py"></script>
   </body>
 </html>

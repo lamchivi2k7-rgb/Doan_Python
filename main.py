@@ -2,6 +2,7 @@ from pyscript import window, document
 from pyodide.ffi import create_proxy
 import json
 from datetime import datetime
+import random # Thêm random để tạo ID không trùng lặp
 
 products = []
 orders = []
@@ -9,12 +10,13 @@ deleted_products = []
 
 current_modal_index = -1
 current_modal_action = ""
-current_return_order_id = ""  # Biến nhớ đơn hàng đang chọn để đổi ý hủy/đổi hàng
+current_return_order_id = "" 
 
 def load_data():
     global products, orders, deleted_products
     orders_data = window.localStorage.getItem('pyscript_orders_db')
     orders = json.loads(orders_data) if orders_data else []
+    
     deleted_data = window.localStorage.getItem('pyscript_deleted_db')
     deleted_products = json.loads(deleted_data) if deleted_data else []
     
@@ -22,6 +24,7 @@ def load_data():
     if data:
         products = json.loads(data)
     else:
+        # Dữ liệu mặc định nếu lần đầu chạy ứng dụng
         products = [
             {"name": "Điện thoại iPhone 15 Pro Max 256GB", "price": 29500000, "quantity": 14},
             {"name": "Máy tính bảng iPad Air 5 M1 Wifi", "price": 14200000, "quantity": 8},
@@ -71,7 +74,6 @@ def render_tables():
     if document.getElementById("total-products-qty"):
         document.getElementById("total-products-qty").innerText = f"{total_qty} cái"
     
-    # Doanh thu thực tế tính tổng đơn xuất kho bán lẻ (Trừ các đơn đã được duyệt hoàn trả tiền)
     real_revenue = sum(float(o.get('val', 0)) for o in orders if o.get('type') == "Xuất kho" and o.get('status') != 'refunded')
     if document.getElementById("total-products-value"):
         document.getElementById("total-products-value").innerText = format_currency(real_revenue)
@@ -93,8 +95,12 @@ def open_quantity_modal(index, action):
     modal = document.getElementById("quantity-modal")
     if modal: modal.classList.add("open")
 
-def confirm_quantity_modal(e=None):
+def confirm_quantity_modal(event=None):
     global current_modal_index, current_modal_action
+    # CHẶN RELOAD TRANG KHI SUBMIT MODAL KHO
+    if event:
+        event.preventDefault()
+        
     input_element = document.getElementById("modal-qty-input")
     if not input_element or current_modal_index == -1: return
     
@@ -107,12 +113,13 @@ def confirm_quantity_modal(e=None):
     
     p = products[current_modal_index]
     now_str = datetime.now().strftime("%H:%M %d/%m/%y")
-    order_id = f"DH{datetime.now().strftime('%M%S')}"
+    
+    rand_id = f"{datetime.now().strftime('%M%S')}{random.randint(10, 99)}"
     
     if current_modal_action == "import":
         p['quantity'] = int(p['quantity']) + qty_change
         orders.append({
-            "time": now_str, "id": f"KK{datetime.now().strftime('%M%S')}",
+            "time": now_str, "id": f"KK{rand_id}",
             "type": "Nhập kho", "name": p['name'], "qty": qty_change, "val": 0, "status": "done"
         })
     elif current_modal_action == "export":
@@ -121,7 +128,7 @@ def confirm_quantity_modal(e=None):
             return
         p['quantity'] = int(p['quantity']) - qty_change
         orders.append({
-            "time": now_str, "id": order_id, "type": "Xuất kho",
+            "time": now_str, "id": f"DH{rand_id}", "type": "Xuất kho",
             "name": p['name'], "qty": qty_change, "val": float(p['price']) * qty_change,
             "status": "paid", "return_qty": qty_change, "p_name": p['name']
         })
@@ -131,66 +138,81 @@ def confirm_quantity_modal(e=None):
         
     document.getElementById("quantity-modal").classList.remove("open")
     current_modal_index = -1
-    save_data(); render_tables(); render_orders_table()
+    save_data()
+    render_tables()
+    render_orders_table()
 
 def delete_product(index):
     idx = int(index)
     p = products.pop(idx)
     deleted_products.append({"name": p['name'], "price": p['price'], "quantity": p['quantity']})
+    
+    rand_id = f"{datetime.now().strftime('%M%S')}{random.randint(10, 99)}"
     orders.append({
-        "time": datetime.now().strftime("%H:%M %d/%m/%y"), "id": f"KK{datetime.now().strftime('%M%S')}",
+        "time": datetime.now().strftime("%H:%M %d/%m/%y"), "id": f"KK{rand_id}",
         "type": "Xóa danh mục", "name": p['name'], "qty": p['quantity'], "val": 0, "status": "done"
     })
     save_data(); render_tables(); render_orders_table(); render_deleted_table()
 
-def trigger_return_request(order_id):
-    """Mở Modal chọn lý do Shopee khi nhấn nút Đổi ý hoàn đơn"""
+def trigger_cancel_modal(order_id):
     global current_return_order_id
     current_return_order_id = order_id
-    
-    document.getElementById("return-modal-oid").textContent = order_id
-    document.getElementById("return-reason-text").value = ""
-    
-    document.getElementById("return-submit-btn").onclick = create_proxy(submit_return_request)
-    document.getElementById("return-reason-modal").classList.add("open")
+    document.getElementById("cancel-modal-oid").textContent = order_id
+    document.getElementById("cancel-reason-text").value = ""
+    document.getElementById("modal-cancel-refund").classList.add("open")
 
-def submit_return_request(event):
-    """Xử lý phân loại trạng thái khi bấm Gửi Yêu Cầu trên Modal"""
+def submit_cancel_request(event):
     global current_return_order_id, orders
+    # CHẶN RELOAD TRANG KHI SUBMIT YÊU CẦU HỦY ĐƠN
+    if event:
+        event.preventDefault()
+        
     if not current_return_order_id: return
-    
-    radio_inputs = document.getElementsByName("return_action_type")
-    selected_action = "cancel_refund"
-    for r in radio_inputs:
-        if r.checked:
-            selected_action = r.value
-            break
-            
-    reason_raw = document.getElementById("return-reason-text").value.strip()
-    reason_display = reason_raw if reason_raw else "Khách hàng đổi ý riêng"
+    reason_raw = document.getElementById("cancel-reason-text").value.strip()
+    reason_display = reason_raw if reason_raw else "Đổi ý không mua nữa"
     
     for o in orders:
         if o.get('id') == current_return_order_id:
-            if selected_action == "cancel_refund":
-                o['status'] = 'return_pending'
-                o['return_reason'] = f"Hủy hoàn tiền: {reason_display}"
-            else:
-                o['status'] = 'exchange_pending'
-                o['return_reason'] = f"Yêu cầu đổi hàng: {reason_display}"
+            o['status'] = 'return_pending'
+            o['return_reason'] = f"Hủy hoàn tiền: {reason_display}"
             break
             
-    document.getElementById("return-reason-modal").classList.remove("open")
+    document.getElementById("modal-cancel-refund").classList.remove("open")
+    current_return_order_id = "" 
+    save_data(); render_orders_table()
+
+def trigger_exchange_modal(order_id):
+    global current_return_order_id
+    current_return_order_id = order_id
+    document.getElementById("exchange-modal-oid").textContent = order_id
+    document.getElementById("exchange-reason-text").value = ""
+    document.getElementById("modal-exchange-product").classList.add("open")
+
+def submit_exchange_request(event):
+    global current_return_order_id, orders
+    # CHẶN RELOAD TRANG KHI SUBMIT YÊU CẦU ĐỔI HÀNG
+    if event:
+        event.preventDefault()
+        
+    if not current_return_order_id: return
+    reason_raw = document.getElementById("exchange-reason-text").value.strip()
+    reason_display = reason_raw if reason_raw else "Sản phẩm lỗi/Sai thông số"
+    
+    for o in orders:
+        if o.get('id') == current_return_order_id:
+            o['status'] = 'exchange_pending'
+            o['return_reason'] = f"Yêu cầu đổi hàng: {reason_display}"
+            break
+            
+    document.getElementById("modal-exchange-product").classList.remove("open")
+    current_return_order_id = "" 
     save_data(); render_orders_table()
 
 def approve_return_request(order_id):
-    """Admin duyệt phê duyệt các yêu cầu Trả hàng / Hoàn tiền hoặc đổi sản phẩm"""
     global orders, products
     for o in orders:
         if o.get('id') == order_id and o.get('status') in ['return_pending', 'exchange_pending']:
-            prev_status = o['status']
             o['status'] = 'refunded'
-            
-            # Đưa số lượng vật lý cộng trả trực tiếp ngược lại kho hàng
             found_prod = False
             for p in products:
                 if p['name'] == o.get('p_name', ''):
@@ -214,21 +236,28 @@ def render_orders_table():
     search_val = document.getElementById("search-order").value.strip().lower() if document.getElementById("search-order") else ""
     
     for o in reversed(orders):
-        if search_val and search_val not in o['id'].lower() and search_val not in o['name'].lower(): continue
+        # Sử dụng .get() để tránh lỗi KeyError an toàn tuyệt đối
+        order_id = o.get('id', '')
+        order_name = o.get('name', '')
+        order_time = o.get('time', 'Không rõ')
+        order_type = o.get('type', 'Chưa phân loại')
+        order_qty = o.get('qty', 0)
+        
+        if search_val and search_val not in order_id.lower() and search_val not in order_name.lower(): continue
         tr = document.createElement("tr")
         current_status = o.get('status', 'done')
         
         td_time = document.createElement("td")
-        td_time.innerHTML = f"<span class='text-muted' style='font-size:0.85rem;'>{o['time']}</span>"
+        td_time.innerHTML = f"<span class='text-muted' style='font-size:0.85rem;'>{order_time}</span>"
         tr.appendChild(td_time)
         
         td_id = document.createElement("td")
-        td_id.innerHTML = f"<strong class='text-blue'>{o['id']}</strong>"
+        td_id.innerHTML = f"<strong class='text-blue'>{order_id}</strong>"
         tr.appendChild(td_id)
         
         td_name = document.createElement("td")
         td_name.className = "fw-semibold"
-        td_name.textContent = f"[{o['type']}] {o['name']} (SL: {o['qty']})"
+        td_name.textContent = f"[{order_type}] {order_name} (SL: {order_qty})"
         tr.appendChild(td_name)
         
         td_val = document.createElement("td")
@@ -237,56 +266,68 @@ def render_orders_table():
         td_status = document.createElement("td")
         td_act = document.createElement("td")
         
-        if o['id'].startswith('KK'):
+        if order_id.startswith('KK'):
             td_status.innerHTML = "<span class='badge bg-danger'>Kiểm kho</span>"
             td_val.textContent = "Kiểm toán"
             td_act.innerHTML = "<span class='text-muted' style='font-size:0.85rem;'>-</span>"
         else:
             if current_status == 'paid':
                 td_status.innerHTML = "<span class='badge bg-success'>Đã thanh toán</span>"
-                td_val.textContent = format_currency(o['val'])
+                td_val.textContent = format_currency(o.get('val', 0))
                 
-                btn_ret = document.createElement("button")
-                btn_ret.innerHTML = "<i class='fa-solid fa-arrow-turn-down'></i> Đổi ý hoàn đơn"
-                btn_ret.className = "btn-gcp-pay"
-                btn_ret.style.fontSize = "0.75rem"; btn_ret.style.padding = "4px 8px"; btn_ret.style.backgroundColor = "#f59e0b"
-                btn_ret.addEventListener("click", create_proxy(lambda e, oid=o['id']: trigger_return_request(oid)))
-                td_act.appendChild(btn_ret)
+                div_btns = document.createElement("div")
+                div_btns.style.display = "flex"
+                div_btns.style.gap = "4px"
+                
+                btn_cancel_call = document.createElement("button")
+                btn_cancel_call.innerHTML = "<i class='fa-solid fa-circle-xmark'></i> Chọn Hủy"
+                btn_cancel_call.className = "btn-gcp-cancel"
+                btn_cancel_call.style.fontSize = "0.7rem"; btn_cancel_call.style.padding = "4px 6px"
+                btn_cancel_call.addEventListener("click", create_proxy(lambda e, oid=order_id: trigger_cancel_modal(oid)))
+                
+                btn_exchange_call = document.createElement("button")
+                btn_exchange_call.innerHTML = "<i class='fa-solid fa-arrows-rotate'></i> Hoàn Đổi"
+                btn_exchange_call.className = "btn-gcp-pay"
+                btn_exchange_call.style.fontSize = "0.7rem"; btn_exchange_call.style.padding = "4px 6px"; btn_exchange_call.style.backgroundColor = "#3b82f6"
+                btn_exchange_call.addEventListener("click", create_proxy(lambda e, oid=order_id: trigger_exchange_modal(oid)))
+                
+                div_btns.appendChild(btn_cancel_call)
+                div_btns.appendChild(btn_exchange_call)
+                td_act.appendChild(div_btns)
                 
             elif current_status == 'return_pending':
                 title_reason = o.get('return_reason', 'Yêu cầu hủy')
                 td_status.innerHTML = f"<span class='badge bg-warning text-dark' title='{title_reason}' style='cursor:pointer;'><i class='fa-solid fa-clock-rotate-left'></i> Chờ duyệt hoàn tiền</span>"
-                td_val.textContent = format_currency(o['val'])
+                td_val.textContent = format_currency(o.get('val', 0))
                 
                 btn_app = document.createElement("button")
                 btn_app.innerHTML = "<i class='fa-solid fa-circle-check'></i> Duyệt Hoàn Tiền"
                 btn_app.className = "btn-gcp-serve"
                 btn_app.style.fontSize = "0.75rem"; btn_app.style.padding = "4px 8px"
-                btn_app.addEventListener("click", create_proxy(lambda e, oid=o['id']: approve_return_request(oid)))
+                btn_app.addEventListener("click", create_proxy(lambda e, oid=order_id: approve_return_request(oid)))
                 td_act.appendChild(btn_app)
                 
             elif current_status == 'exchange_pending':
                 title_reason = o.get('return_reason', 'Yêu cầu đổi')
                 td_status.innerHTML = f"<span class='badge' style='background-color:#06b6d4 !important; color:#fff; cursor:pointer;' title='{title_reason}'><i class='fa-solid fa-arrows-rotate'></i> Chờ duyệt đổi hàng</span>"
-                td_val.textContent = format_currency(o['val'])
+                td_val.textContent = format_currency(o.get('val', 0))
                 
                 btn_app = document.createElement("button")
                 btn_app.innerHTML = "<i class='fa-solid fa-circle-check'></i> Duyệt Đổi Hàng"
                 btn_app.className = "btn-gcp-serve"
                 btn_app.style.fontSize = "0.75rem"; btn_app.style.padding = "4px 8px"; btn_app.style.backgroundColor = "#06b6d4"
-                btn_app.addEventListener("click", create_proxy(lambda e, oid=o['id']: approve_return_request(oid)))
+                btn_app.addEventListener("click", create_proxy(lambda e, oid=order_id: approve_return_request(oid)))
                 td_act.appendChild(btn_app)
                 
             elif current_status == 'refunded':
                 td_status.innerHTML = "<span class='badge bg-secondary' style='background-color:#64748b !important;'><i class='fa-solid fa-arrow-rotate-left'></i> Đã hoàn trả kho</span>"
-                td_val.innerHTML = f"<del style='color:#94a3b8;'>{format_currency(o['val'])}</del>"
+                td_val.innerHTML = f"<del style='color:#94a3b8;'>{format_currency(o.get('val', 0))}</del>"
                 td_act.innerHTML = "<span class='text-muted' style='font-size:0.85rem; color:#94a3b8; font-weight:500;'>Hoàn tất</span>"
                 
         tr.appendChild(td_val)
         tr.appendChild(td_status)
         tr.appendChild(td_act)
         tbody.appendChild(tr)
-
 def handle_search_product(e):
     render_tables()
 
@@ -294,6 +335,10 @@ def handle_search_order(e):
     render_orders_table()
 
 def add_product(event):
+    # CHẶN RELOAD TRANG TUYỆT ĐỐI KHI BẤM THÊM SẢN PHẨM
+    if event:
+        event.preventDefault()
+        
     name = document.getElementById("product-name").value.strip()
     price_str = document.getElementById("product-price").value.strip()
     qty_str = document.getElementById("product-quantity").value.strip()
@@ -306,7 +351,8 @@ def add_product(event):
     document.getElementById("product-name").value = ""
     document.getElementById("product-price").value = ""
     document.getElementById("product-quantity").value = ""
-    save_data(); render_tables()
+    save_data()
+    render_tables()
 
 def render_deleted_table():
     tbody = document.getElementById("deleted-tbody")
@@ -323,5 +369,11 @@ def main():
     if document.getElementById("search-input"): document.getElementById("search-input").addEventListener("input", create_proxy(handle_search_product))
     if document.getElementById("search-order"): document.getElementById("search-order").addEventListener("input", create_proxy(handle_search_order))
     if document.getElementById("modal-confirm-btn"): document.getElementById("modal-confirm-btn").addEventListener("click", create_proxy(confirm_quantity_modal))
+    
+    if document.getElementById("cancel-submit-btn"): document.getElementById("cancel-submit-btn").addEventListener("click", create_proxy(submit_cancel_request))
+    if document.getElementById("exchange-submit-btn"): document.getElementById("exchange-submit-btn").addEventListener("click", create_proxy(submit_exchange_request))
+
+    window.openQuantityModal = create_proxy(open_quantity_modal)
+    window.deleteProduct = create_proxy(delete_product)
 
 main()

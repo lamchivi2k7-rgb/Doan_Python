@@ -1221,3 +1221,60 @@ tr:hover td {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Style cho nhóm nút hành động tách rời trong bảng đơn hàng */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.action-btn i {
+  font-size: 12px;
+}
+
+/* Nút Hủy Đơn - Màu đỏ */
+.btn-danger {
+  background-color: #ef4444;
+}
+.btn-danger:hover {
+  background-color: #dc2626;
+}
+
+/* Nút Hoàn Tiền - Màu cam/vàng */
+.btn-warning {
+  background-color: #f59e0b;
+}
+.btn-warning:hover {
+  background-color: #d97706;
+}
+
+/* Nút Đổi Hàng - Màu xanh dương */
+.btn-blue {
+  background-color: #3b82f6;
+}
+.btn-blue:hover {
+  background-color: #2563eb;
+}
+
+/* Badge trạng thái */
+.badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.badge-info { background-color: #e0f2fe; color: #0369a1; }
+.badge-danger { background-color: #fee2e2; color: #b91c1c; }
+.badge-warning { background-color: #fef3c7; color: #b45309; }
+
+

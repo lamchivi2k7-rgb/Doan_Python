@@ -1,4 +1,4 @@
-const CACHE_NAME = "gcp-management-offline-v1";
+const CACHE_NAME = "gcp-management-offline-v2";
 const ASSETS = [
   "./",
   "./index.html",
