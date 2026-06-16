@@ -1232,27 +1232,27 @@ tr:hover td {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 14px;      
+  padding: 8px 14px;
   font-size: 13px;
-  font-weight: 600;       
+  font-weight: 600;
   border: none;
-  border-radius: 8px;     
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
-  color: white !important; 
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  color: white !important;
   position: relative;
   overflow: hidden;
 }
 
 /* Hiệu ứng đưa chuột vào (Hover) chung */
 .action-btn:hover {
-  transform: translateY(-2px); 
-  filter: brightness(1.1);     
+  transform: translateY(-2px);
+  filter: brightness(1.1);
 }
 
 /* Hiệu ứng khi nhấn giữ nút (Active) */
 .action-btn:active {
-  transform: translateY(1px);  
+  transform: translateY(1px);
 }
 
 .action-btn i {
@@ -1286,8 +1286,6 @@ tr:hover td {
   box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4) !important;
 }
 
-
-
 /* Cập nhật trong index.css */
 .modal-content {
   background: #ffffff;
@@ -1296,7 +1294,7 @@ tr:hover td {
   border-radius: 16px; /* Bo góc tròn hơn */
   padding: 24px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); /* Đổ bóng sâu hơn */
-  border: 1px solid rgba(0,0,0,0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .modal-footer {
@@ -1339,4 +1337,295 @@ th {
 
 .action-btn:active {
   transform: scale(0.97); /* Hiệu ứng nhấn nút thu nhỏ nhẹ */
+}
+
+/* ======================================================== */
+/* 🔐 TRANG ĐĂNG NHẬP (LOGIN SCREEN)                         */
+/* ======================================================== */
+.login-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+  overflow: hidden;
+}
+
+.login-screen.hidden {
+  display: none;
+}
+
+/* Animated background dots */
+.login-screen::before {
+  content: "";
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(
+    circle,
+    rgba(0, 102, 204, 0.15) 0%,
+    transparent 70%
+  );
+  top: -100px;
+  right: -100px;
+  border-radius: 50%;
+  animation: floatBubble 8s ease-in-out infinite;
+}
+.login-screen::after {
+  content: "";
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(
+    circle,
+    rgba(16, 185, 129, 0.1) 0%,
+    transparent 70%
+  );
+  bottom: -80px;
+  left: -80px;
+  border-radius: 50%;
+  animation: floatBubble 10s ease-in-out infinite reverse;
+}
+
+@keyframes floatBubble {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+}
+
+.login-card {
+  background: rgba(255, 255, 255, 0.97);
+  width: 90%;
+  max-width: 420px;
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  position: relative;
+  z-index: 2;
+  animation: loginCardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes loginCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.login-logo .logo-icon {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #0066cc, #0052a3);
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: white;
+  margin-bottom: 1rem;
+  box-shadow: 0 8px 20px rgba(0, 102, 204, 0.3);
+}
+.login-logo h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+}
+.login-logo p {
+  font-size: 0.88rem;
+  color: #64748b;
+  margin-top: 0.35rem;
+}
+
+.login-form-group {
+  margin-bottom: 1.25rem;
+}
+.login-form-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+.login-form-group .input-wrapper {
+  position: relative;
+}
+.login-form-group .input-wrapper i {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+.login-form-group .input-wrapper input {
+  width: 100%;
+  padding: 0.85rem 1rem 0.85rem 2.75rem;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.25s ease;
+}
+.login-form-group .input-wrapper input:focus {
+  border-color: #0066cc;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.08);
+}
+.login-form-group .input-wrapper input:focus + i,
+.login-form-group .input-wrapper input:focus ~ i {
+  color: #0066cc;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 0.95rem;
+  background: linear-gradient(135deg, #0066cc, #0052a3);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  box-shadow: 0 4px 15px rgba(0, 102, 204, 0.25);
+}
+.login-btn:hover {
+  background: linear-gradient(135deg, #0052a3, #003d7a);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 102, 204, 0.35);
+}
+.login-btn:active {
+  transform: translateY(0);
+}
+
+.login-error {
+  color: #ef4444;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 1rem;
+  min-height: 22px;
+  transition: all 0.2s;
+}
+
+.login-hint {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+.login-hint strong {
+  color: #64748b;
+}
+
+/* ======================================================== */
+/* 🔓 NÚT ĐĂNG XUẤT SIDEBAR                                 */
+/* ======================================================== */
+.logout-btn {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 1rem;
+  transition: all 0.25s ease;
+}
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+.logout-btn i {
+  font-size: 1rem;
+}
+
+.sidebar-action-btn {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  color: #3b82f6;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 1rem;
+  transition: all 0.25s ease;
+}
+.sidebar-action-btn:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+/* ROLE BADGE */
+.role-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.role-badge.manager {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+.role-badge.staff {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+/* Ẩn phần tử theo quyền */
+.hidden-by-role {
+  display: none !important;
+}
+
+/* Dashboard mặc định ẩn khi chưa login */
+.dashboard-container.hidden {
+  display: none !important;
 }

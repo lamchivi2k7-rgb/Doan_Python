@@ -10,7 +10,212 @@ deleted_products = []
 
 current_modal_index = -1
 current_modal_action = ""
-current_return_order_id = "" 
+current_return_order_id = ""
+
+# ====== HỆ THỐNG ĐĂNG NHẬP & PHÂN QUYỀN ======
+current_user_role = ""  # "manager" hoặc "staff"
+current_user_name = ""
+
+def get_accounts():
+    """Lấy danh sách tài khoản từ localStorage, tạo mặc định nếu chưa có"""
+    try:
+        data = window.localStorage.getItem('pyscript_accounts_db')
+        if data:
+            return json.loads(data)
+    except:
+        pass
+    # Tài khoản mặc định
+    default_accounts = [
+        {"username": "admin", "pin": "1234", "role": "manager", "display_name": "Quản Lý"},
+        {"username": "staff", "pin": "0000", "role": "staff", "display_name": "Nhân Viên"}
+    ]
+    window.localStorage.setItem('pyscript_accounts_db', json.dumps(default_accounts))
+    return default_accounts
+
+def do_login(e):
+    """Xử lý đăng nhập"""
+    global current_user_role, current_user_name
+    
+    username_el = document.getElementById("login-username")
+    pin_el = document.getElementById("login-pin")
+    error_el = document.getElementById("login-error")
+    
+    username = username_el.value.strip().lower() if username_el else ""
+    pin = pin_el.value.strip() if pin_el else ""
+    
+    if not username or not pin:
+        if error_el: error_el.innerText = "⚠ Vui lòng nhập đầy đủ tên đăng nhập và mã PIN!"
+        return
+    
+    accounts = get_accounts()
+    matched = None
+    for acc in accounts:
+        if acc['username'] == username and acc['pin'] == pin:
+            matched = acc
+            break
+    
+    if not matched:
+        if error_el: error_el.innerText = "⚠ Sai tên đăng nhập hoặc mã PIN!"
+        return
+    
+    # Đăng nhập thành công
+    current_user_role = matched['role']
+    current_user_name = matched['display_name']
+    
+    # Ẩn login, hiện dashboard
+    document.getElementById("login-screen").classList.add("hidden")
+    document.getElementById("dashboard-container").classList.remove("hidden")
+    
+    # Cập nhật sidebar
+    sidebar_name = document.getElementById("sidebar-username")
+    if sidebar_name: sidebar_name.innerText = current_user_name
+    
+    sidebar_role = document.getElementById("sidebar-role-badge")
+    if sidebar_role:
+        if current_user_role == "manager":
+            sidebar_role.innerHTML = '<span class="role-badge manager">Quản lý</span>'
+        else:
+            sidebar_role.innerHTML = '<span class="role-badge staff">Nhân viên</span>'
+    
+    # Reset form
+    if username_el: username_el.value = ""
+    if pin_el: pin_el.value = ""
+    if error_el: error_el.innerText = ""
+    
+    # Áp dụng quyền và render dữ liệu
+    apply_role_permissions()
+    render_tables()
+    render_orders_table()
+    render_deleted_table()
+
+def do_logout(e):
+    """Xử lý đăng xuất"""
+    global current_user_role, current_user_name
+    current_user_role = ""
+    current_user_name = ""
+    
+    # Ẩn dashboard, hiện login
+    document.getElementById("dashboard-container").classList.add("hidden")
+    document.getElementById("login-screen").classList.remove("hidden")
+
+def apply_role_permissions():
+    """Hiện/ẩn các phần tử UI theo quyền"""
+    is_manager = current_user_role == "manager"
+    
+    # Tab Báo cáo - chỉ quản lý
+    btn_reports = document.getElementById("btn-tab-reports")
+    if btn_reports:
+        if is_manager:
+            btn_reports.classList.remove("hidden-by-role")
+        else:
+            btn_reports.classList.add("hidden-by-role")
+    
+    # Tab Tồn kho (Thùng rác) - chỉ quản lý
+    btn_inventory = document.getElementById("btn-tab-inventory")
+    if btn_inventory:
+        if is_manager:
+            btn_inventory.classList.remove("hidden-by-role")
+        else:
+            btn_inventory.classList.add("hidden-by-role")
+    
+    # Form thêm sản phẩm mới - chỉ quản lý
+    add_form_card = document.getElementById("add-product-card")
+    if add_form_card:
+        if is_manager:
+            add_form_card.classList.remove("hidden-by-role")
+        else:
+            add_form_card.classList.add("hidden-by-role")
+    
+    # Báo lại các hành động nút quản lý nhân sự
+    manage_pin_btn = document.getElementById("manage-pin-btn")
+    if manage_pin_btn:
+        if is_manager:
+            manage_pin_btn.classList.remove("hidden-by-role")
+        else:
+            manage_pin_btn.classList.add("hidden-by-role")
+
+    # Ẩn/hiện cột giá vốn / giá bán theo vai trò
+    for cell in document.querySelectorAll(".column-cost, .column-price"):
+        if is_manager:
+            cell.classList.remove("hidden-by-role")
+        else:
+            cell.classList.add("hidden-by-role")
+
+    # Nếu nhân viên đang ở tab bị ẩn, chuyển về tab đơn hàng
+    if not is_manager:
+        window.switchDashboardTab("orders")
+
+
+def update_account_pin(username, new_pin):
+    """Cập nhật hoặc tạo mã PIN cho tài khoản nhân viên."""
+    accounts = get_accounts()
+    updated = False
+    for acc in accounts:
+        if acc.get('username') == username:
+            acc['pin'] = new_pin
+            updated = True
+            break
+    if not updated:
+        accounts.append({
+            'username': username,
+            'pin': new_pin,
+            'role': 'staff',
+            'display_name': 'Nhân Viên'
+        })
+    window.localStorage.setItem('pyscript_accounts_db', json.dumps(accounts))
+    return accounts
+
+
+def open_pin_modal():
+    """Mở modal quản lý PIN nhân viên cho quản lý."""
+    accounts = get_accounts()
+    select_el = document.getElementById('pin-account-select')
+    error_el = document.getElementById('pin-error-msg')
+    if not select_el:
+        return
+
+    staff_accounts = [acc for acc in accounts if acc.get('role') == 'staff']
+    if not staff_accounts:
+        staff_accounts = [{'username': 'staff', 'pin': '0000', 'role': 'staff', 'display_name': 'Nhân Viên'}]
+
+    select_el.innerHTML = ""
+    for acc in staff_accounts:
+        option = document.createElement('option')
+        option.value = acc.get('username', '')
+        option.innerText = acc.get('username', '')
+        select_el.appendChild(option)
+
+    if error_el:
+        error_el.innerText = ""
+    pin_input = document.getElementById('pin-account-value')
+    if pin_input:
+        pin_input.value = ""
+
+    document.getElementById('modal-manage-pin').classList.add('open')
+
+
+def save_pin_changes(e):
+    select_el = document.getElementById('pin-account-select')
+    pin_input = document.getElementById('pin-account-value')
+    error_el = document.getElementById('pin-error-msg')
+    if not select_el or not pin_input or not error_el:
+        return
+
+    username = select_el.value.strip()
+    new_pin = pin_input.value.strip()
+    if not username or not new_pin:
+        error_el.innerText = '⚠ Vui lòng nhập mã PIN mới cho nhân viên.'
+        return
+    if len(new_pin) < 4:
+        error_el.innerText = '⚠ Mã PIN phải ít nhất 4 ký tự.'
+        return
+
+    update_account_pin(username, new_pin)
+    error_el.innerText = ''
+    if document.getElementById('modal-manage-pin'):
+        document.getElementById('modal-manage-pin').classList.remove('open')
+    window.showNotification(f"Đã cập nhật mã PIN cho {username}.")
+
 
 def load_data():
     global products, orders, deleted_products
@@ -99,22 +304,38 @@ def render_tables():
         search_el = document.getElementById("search-input")
         search_q = search_el.value.lower() if search_el else ""
         
+        is_manager = current_user_role == "manager"
+        
         for idx, p in enumerate(products):
             if search_q and search_q not in p.get('name', '').lower():
                 continue
                 
             tr = document.createElement("tr")
-            tr.innerHTML = f"""
-                <td style="font-weight: 500;">{p.get('name', 'Không tên')}</td>
-                <td style="color: #f59e0b; font-weight:600;">{format_currency(p.get('cost', 0))}</td>
-                <td style="color: #10b981; font-weight: 600;">{format_currency(p.get('price', 0))}</td>
-                <td style="font-weight: 700;">{p.get('quantity', 0)} cái</td>
-                <td>
-                    <button class="action-btn" style="background-color: #10b981;" onclick="openQuantityModal({idx}, 'import')"><i class="fa-solid fa-square-plus"></i> Nhập</button>
-                    <button class="action-btn" style="background-color: #3b82f6;" onclick="openQuantityModal({idx}, 'export')"><i class="fa-solid fa-cart-arrow-down"></i> Bán</button>
-                    <button class="action-btn" style="background-color: #ef4444;" onclick="deleteProduct({idx})"><i class="fa-solid fa-trash-can"></i> Xóa</button>
-                </td>
-            """
+            
+            if is_manager:
+                # Quản lý: hiện đầy đủ giá vốn, giá bán, và tất cả nút
+                tr.innerHTML = f"""
+                    <td style="font-weight: 500;">{p.get('name', 'Không tên')}</td>
+                    <td class="column-cost" style="color: #f59e0b; font-weight:600;">{format_currency(p.get('cost', 0))}</td>
+                    <td class="column-price" style="color: #10b981; font-weight: 600;">{format_currency(p.get('price', 0))}</td>
+                    <td style="font-weight: 700;">{p.get('quantity', 0)} cái</td>
+                    <td>
+                        <button class="action-btn" style="background-color: #10b981;" onclick="openQuantityModal({idx}, 'import')"><i class="fa-solid fa-square-plus"></i> Nhập</button>
+                        <button class="action-btn" style="background-color: #3b82f6;" onclick="openQuantityModal({idx}, 'export')"><i class="fa-solid fa-cart-arrow-down"></i> Bán</button>
+                        <button class="action-btn" style="background-color: #ef4444;" onclick="deleteProduct({idx})"><i class="fa-solid fa-trash-can"></i> Xóa</button>
+                    </td>
+                """
+            else:
+                # Nhân viên: chỉ thấy tên, số lượng, nút Bán
+                tr.innerHTML = f"""
+                    <td style="font-weight: 500;">{p.get('name', 'Không tên')}</td>
+                    <td class="column-cost" style="color: #94a3b8;">---</td>
+                    <td class="column-price" style="color: #94a3b8;">---</td>
+                    <td style="font-weight: 700;">{p.get('quantity', 0)} cái</td>
+                    <td>
+                        <button class="action-btn" style="background-color: #3b82f6;" onclick="openQuantityModal({idx}, 'export')"><i class="fa-solid fa-cart-arrow-down"></i> Bán</button>
+                    </td>
+                """
             tbody.appendChild(tr)
             
     render_reports()
@@ -162,32 +383,40 @@ def render_orders_table():
             
         st = status_map.get(status_current, {"text": status_current, "class": ""})
         
-        # TÌM ĐOẠN NÀY TRONG HÀM render_orders_table() VÀ THAY THẾ:
+        # Nhân viên không được hủy đơn / đổi trả / duyệt
         action_html = ""
+        is_manager = current_user_role == "manager"
+        
         if status_current in ['paid', 'kiemtuan']:
-            # Xóa sạch thuộc tính style="..." cũ để nhường chỗ cho CSS custom hoạt động
-            action_html = f"""
-                <button class="action-btn cancel-btn" onclick="openCancelModal('{o['id']}')">
-                    <i class="fa-solid fa-circle-xmark"></i> Hủy đơn
-                </button>
-                <button class="action-btn exchange-btn" onclick="openExchangeModal('{o['id']}')">
-                    <i class="fa-solid fa-arrows-rotate"></i> Đổi trả
-                </button>
-            """
+            if is_manager:
+                action_html = f"""
+                    <button class="action-btn cancel-btn" onclick="openCancelModal('{o['id']}')">
+                        <i class="fa-solid fa-circle-xmark"></i> Hủy đơn
+                    </button>
+                    <button class="action-btn exchange-btn" onclick="openExchangeModal('{o['id']}')">
+                        <i class="fa-solid fa-arrows-rotate"></i> Đổi trả
+                    </button>
+                """
+            else:
+                action_html = """<span style="color:#64748b; font-size:12px;">Chỉ quản lý mới thao tác</span>"""
         elif status_current == 'return_pending':
-            # Thay style="background-color:#10b981" bằng class "approve-btn" của bạn
-            action_html = f"""
-                <button class="action-btn approve-btn" onclick="approveRefund('{o['id']}')">
-                    <i class="fa-solid fa-check"></i> Duyệt hoàn tiền
-                </button>
-            """
+            if is_manager:
+                action_html = f"""
+                    <button class="action-btn approve-btn" onclick="approveRefund('{o['id']}')">
+                        <i class="fa-solid fa-check"></i> Duyệt hoàn tiền
+                    </button>
+                """
+            else:
+                action_html = """<span style="color:#f59e0b; font-size:12px;">Đang chờ quản lý duyệt</span>"""
         elif status_current == 'exchange_pending':
-            # Tương tự cho nút duyệt đổi trả
-            action_html = f"""
-                <button class="action-btn approve-btn" onclick="approveExchange('{o['id']}')">
-                    <i class="fa-solid fa-check"></i> Duyệt đổi trả
-                </button>
-            """
+            if is_manager:
+                action_html = f"""
+                    <button class="action-btn approve-btn" onclick="approveExchange('{o['id']}')">
+                        <i class="fa-solid fa-check"></i> Duyệt đổi trả
+                    </button>
+                """
+            else:
+                action_html = """<span style="color:#f59e0b; font-size:12px;">Đang chờ quản lý duyệt</span>"""
         else:
             action_html = """<span style="color:#64748b; font-size:12px;">Đã đóng giao dịch</span>"""
 
@@ -324,11 +553,18 @@ def add_product(e):
 def open_quantity_modal(index, action):
     global current_modal_index, current_modal_action
     current_modal_index = int(index)
-    current_modal_action = action
+    current_modal_action = str(action)
     
     p = products[current_modal_index]
-    title = f"Nhập Thêm Kho: {p.get('name', '')}" if action == "import" else f"Tạo Đơn Bán Xuất Kho: {p.get('name', '')}"
-    confirm_btn_color = "#10b981" if action == "import" else "#3b82f6"
+    if action == "import":
+        title = f"Nhập Thêm Kho: {p.get('name', '')}"
+        confirm_btn_color = "#10b981"
+    elif action == "delete":
+        title = f"Xóa Sản Phẩm: {p.get('name', '')} (Tồn kho: {p.get('quantity', 0)})"
+        confirm_btn_color = "#ef4444"
+    else:
+        title = f"Tạo Đơn Bán Xuất Kho: {p.get('name', '')}"
+        confirm_btn_color = "#3b82f6"
     
     document.getElementById("modal-title").innerText = title
     document.getElementById("modal-qty-input").value = ""
@@ -371,35 +607,35 @@ def confirm_quantity_modal(e):
         save_orders()
         render_orders_table()
         window.showModal(f"Đã xuất hóa đơn {oid} thành công!")
+    elif current_modal_action == "delete":
+        current_qty = int(p.get('quantity', 0))
+        if qty > current_qty:
+            window.showModal(f"Thất bại! Kho chỉ còn {current_qty} cái, không thể xóa {qty} cái!")
+            return
+        if qty == current_qty:
+            # Xóa toàn bộ sản phẩm khỏi danh sách
+            deleted_p = products.pop(current_modal_index)
+            deleted_p['quantity'] = qty
+            deleted_products.append(deleted_p)
+        else:
+            # Trừ số lượng và ghi nhận phần đã xóa
+            p['quantity'] = current_qty - qty
+            deleted_p = p.copy()
+            deleted_p['quantity'] = qty
+            deleted_products.append(deleted_p)
+        save_deleted()
+        render_deleted_table()
+        window.showModal(f"Đã xóa {qty} cái '{p.get('name', '')}' thành công!")
         
     save_products()
     render_tables()
     document.getElementById("quantity-modal").classList.remove("open")
 
-# 1. Hàm này chứa logic xóa thực tế
-def perform_delete_product(index):
-    idx = int(index)
-    p = products[idx]
-    deleted_products.append(products.pop(idx))
-    save_products()
-    save_deleted()
-    render_tables()
-    render_deleted_table()
-
-# 2. Hàm này gọi Modal lên
+# Hàm gọi Modal chọn số lượng xóa
 def delete_product(index):
-    idx = int(index)
-    p = products[idx]
-    
-    # Tạo một proxy cho logic xóa
-    def callback():
-        perform_delete_product(idx)
-        
-    # Gọi Modal thay cho confirm()
-    window.showModal(
-        f"Bạn chắc chắn muốn xóa mặt hàng '{p.get('name','')}'? Toàn bộ hàng tồn hiện tại sẽ đưa vào danh mục thất thoát!", 
-        create_proxy(callback)
-    )
+    open_quantity_modal(index, "delete")
+
+
 
 # 🟩 HÃY SAO CHÉP VÀ DÁN ĐOẠN NÀY VÀO:
 
@@ -523,6 +759,16 @@ def main():
         document.getElementById("cancel-submit-btn").addEventListener("click", create_proxy(submit_cancel_request))
     if document.getElementById("exchange-submit-btn"): 
         document.getElementById("exchange-submit-btn").addEventListener("click", create_proxy(submit_exchange_request))
+    if document.getElementById("login-btn"):
+        document.getElementById("login-btn").addEventListener("click", create_proxy(do_login))
+    if document.getElementById("login-pin"):
+        document.getElementById("login-pin").addEventListener("keypress", create_proxy(lambda e: do_login(e) if e.key == "Enter" else None))
+    if document.getElementById("logout-btn"):
+        document.getElementById("logout-btn").addEventListener("click", create_proxy(do_logout))
+    if document.getElementById("pin-save-btn"):
+        document.getElementById("pin-save-btn").addEventListener("click", create_proxy(save_pin_changes))
+    if document.getElementById("pin-save-btn"):
+        document.getElementById("pin-save-btn").addEventListener("click", create_proxy(save_pin_changes))
 
     window.openQuantityModal = create_proxy(open_quantity_modal)
     window.deleteProduct = create_proxy(delete_product)
@@ -530,6 +776,9 @@ def main():
     window.openExchangeModal = create_proxy(open_exchange_modal)
     window.approveRefund = create_proxy(approve_refund)
     window.approveExchange = create_proxy(approve_exchange)
+    window.openPinModal = create_proxy(open_pin_modal)
+    window.do_login = create_proxy(do_login)
+    window.do_logout = create_proxy(do_logout)
 
 main()
 
